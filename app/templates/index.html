@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LoL Player Statistics</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
+    <link href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold mb-8 text-center text-blue-600">League of Legends Player Statistics</h1>
+        
+        <!-- Search and Filter Section -->
+        <div class="mb-8 flex flex-wrap gap-4">
+            <input type="text" id="searchInput" placeholder="Search players..." 
+                   class="p-2 border rounded-lg flex-1">
+            <select id="teamFilter" class="p-2 border rounded-lg">
+                <option value="">All Teams</option>
+            </select>
+        </div>
+
+        <!-- Stats Table -->
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+            <table id="statsTable" class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Player</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Position</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Games</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Win Rate</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">KDA</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">More</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <!-- Data will be populated here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Player Details Modal -->
+    <div id="playerModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+            <div id="modalContent">
+                <!-- Modal content will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize DataTable and load data
+        $(document).ready(function() {
+            let table = $('#statsTable').DataTable({
+                ajax: {
+                    url: '/api/players',
+                    dataSrc: ''
+                },
+                columns: [
+                    { data: 'PlayerName' },
+                    { data: 'TeamName' },
+                    { data: 'Position' },
+                    { data: 'Games' },
+                    { 
+                        data: 'Winrate',
+                        render: function(data) {
+                            return data + '%';
+                        }
+                    },
+                    { data: 'KDA' },
+                    {
+                        data: null,
+                        render: function(data) {
+                            return '<button class="details-btn px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Details</button>';
+                        }
+                    }
+                ],
+                pageLength: 15,
+                responsive: true
+            });
+
+            // Load team filter options
+            $.get('/api/teams', function(teams) {
+                teams.forEach(team => {
+                    $('#teamFilter').append(`<option value="${team}">${team}</option>`);
+                });
+            });
+
+            // Search and filter functionality
+            $('#searchInput').on('keyup', function() {
+                table.search(this.value).draw();
+            });
+
+            $('#teamFilter').on('change', function() {
+                let url = '/api/players';
+                if (this.value) {
+                    url += '?team=' + encodeURIComponent(this.value);
+                }
+                table.ajax.url(url).load();
+            });
+
+            // Player details modal
+            $('#statsTable').on('click', '.details-btn', function() {
+                let data = table.row($(this).parents('tr')).data();
+                showPlayerDetails(data);
+            });
+        });
+
+        function showPlayerDetails(player) {
+            let content = `
+                <div class="space-y-4">
+                    <h2 class="text-2xl font-bold">${player.PlayerName}</h2>
+                    <p class="text-gray-600">${player.TeamName} | ${player.Position} | ${player.Country}</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-gray-50 p-4 rounded">
+                            <h3 class="font-bold mb-2">Combat Stats</h3>
+                            <p>Avg Kills: ${player.Avgkills}</p>
+                            <p>Avg Deaths: ${player.Avgdeaths}</p>
+                            <p>Avg Assists: ${player.Avgassists}</p>
+                            <p>Solo Kills: ${player.SoloKills}</p>
+                            <p>Penta Kills: ${player.PentaKills}</p>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-4 rounded">
+                            <h3 class="font-bold mb-2">Economy</h3>
+                            <p>CS Per Min: ${player.CSPerMin}</p>
+                            <p>Gold Per Min: ${player.GoldPerMin}</p>
+                            <p>GD@15: ${player.GD15}</p>
+                            <p>CSD@15: ${player.CSD15}</p>
+                        </div>
+
+                        <div class="bg-gray-50 p-4 rounded">
+                            <h3 class="font-bold mb-2">Vision Control</h3>
+                            <p>Vision Score PM: ${player.VSPM}</p>
+                            <p>Wards PM: ${player.AvgWPM}</p>
+                            <p>Wards Cleared PM: ${player.AvgWCPM}</p>
+                            <p>Vision Wards PM: ${player.AvgVWPM}</p>
+                        </div>
+
+                        <div class="bg-gray-50 p-4 rounded">
+                            <h3 class="font-bold mb-2">Additional Info</h3>
+                            <p>Flash Keybind: ${player.FlashKeybind}</p>
+                            <p>First Blood %: ${player.FB}</p>
+                            <p>FB Victim %: ${player.FBVictim}</p>
+                            <p>Kill Participation: ${player.KP}%</p>
+                            <p>Damage Percent: ${player.DamagePercent}%</p>
+                            <p>DPM: ${player.DPM}</p>
+                        </div>
+                    </div>
+
+                    <button onclick="closeModal()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Close</button>
+                </div>
+            `;
+            
+            $('#modalContent').html(content);
+            $('#playerModal').removeClass('hidden');
+        }
+
+        function closeModal() {
+            $('#playerModal').addClass('hidden');
+        }
+    </script>
+</body>
+</html>
